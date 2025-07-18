@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: extract-pod
+  namespace: thwalsh
+spec:
+  # SECURITY CONTEXT:
+  # Make sure UID 264391, GID 1132 match what you have on the HPC side.
+  securityContext:
+    runAsUser: 264391
+    runAsGroup: 1132
+    fsGroup: 1132
+
+  restartPolicy: Never
+
+  # VOLUMES:
+  volumes:
+    - name: hypernets-vol
+      nfs:
+        server: 128.239.56.166
+        # IMPORTANT: Mount the 'hypernets' directory itself, not just /sciclone/home/thwalsh
+        path: /sciclone/home/thwalsh/hypernets
+        readOnly: false
+
+    - name: twford-vol
+      nfs:
+        server: 128.239.56.30
+        path: /sciclone/data10/twford/reddit
+        readOnly: true
+
+    - name: local-vol
+      emptyDir: {}
+
+  containers:
+    - name: extract-container
+      image: ghcr.io/tyson-walsh/hypernets-pip-slim:v12
+      imagePullPolicy: Always
+      resources:
+        requests:
+          memory: "900Gi"
+          cpu: "36"
+        limits:
+          memory: "990Gi"
+          cpu: "45"
+
+      # MOUNT the volumes in the same paths you actually use in your script:
+      volumeMounts:
+        - name: hypernets-vol
+          mountPath: /sciclone/home/thwalsh/hypernets
+        - name: twford-vol
+          mountPath: /sciclone/data10/twford/reddit
+        - name: local-vol
+          mountPath: /tmp
+
+      # WORKING DIR = subdirectory under hypernets that we know exists and is writable
+      workingDir: /sciclone/home/thwalsh/hypernets/data_scripts
+
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+          set -ex
+          echo "------------------------------------------------------------"
+          echo "Hypernets Extraction Pod started at $(date)"
+          echo "Activating virtual environment..."
+          source /venv/bin/activate
+          echo "Listing contents of ../data..."
+          ls -la ../data
+          echo "Executing extract_data.py..."
+          python -u extract_data.py > ../log_files/extract_data_10000.log 2>&1
+          echo "Hypernets data extraction completed successfully at $(date)"
+          echo "Listing working directory contents:"
+          ls -lh

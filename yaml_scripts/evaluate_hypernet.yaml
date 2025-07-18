@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: evaluate-hypernet-10000
+  namespace: thwalsh
+spec:
+  securityContext:
+    runAsUser: 264391
+    runAsGroup: 1132
+  restartPolicy: Never
+  # nodeSelector:
+    # nvidia.com/gpu.product: NVIDIA-A40
+  volumes:
+    - name: home-vol
+      nfs:
+        server: 128.239.56.166
+        path: /sciclone/home/thwalsh
+    - name: local-vol
+      emptyDir: {}
+  containers:
+    - name: evaluate-hypernet-10000-container
+      image: ghcr.io/tyson-walsh/hypernets-pip-slim:v12
+      imagePullPolicy: Always
+      resources:
+        requests:
+          memory: "48Gi"
+          cpu: "8"
+          nvidia.com/gpu: "2"
+        limits:
+          memory: "96Gi"
+          cpu: "24"
+          nvidia.com/gpu: "2"
+      volumeMounts:
+        - name: home-vol
+          mountPath: /sciclone/home/thwalsh
+        - name: local-vol
+          mountPath: /tmp
+      workingDir: /
+      env:
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0,1"
+        - name: HIERARCHICAL_HYPERNET   # "false" → g-only; "true" → g + i vectors
+          value: "false"
+        - name: DO_FEATURE_PERM         # compute permutation importance
+          value: "true"
+        - name: DEMO_MODE               # quick smoke-test mode
+          value: "false"
+        - name: CUBLAS_WORKSPACE_CONFIG # silence cuBLAS determinism warnings
+          value: ":4096:8"
+        - name: PYTHONWARNINGS          # mute residual torch chatter
+          value: "ignore"
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+          set -ex
+
+          echo "Staging evaluation Parquet files to /tmp (NVMe)…"
+          cp -a /sciclone/home/thwalsh/hypernets/data/test_full_10000.parquet \
+                /sciclone/home/thwalsh/hypernets/data/global_features_10000.parquet \
+                /tmp/
+          [ "${HIERARCHICAL_HYPERNET}" = "true" ] && \
+            cp -a /sciclone/home/thwalsh/hypernets/data/instance_features_10000.parquet /tmp/
+
+          echo "Starting Dual-GPU hypernet evaluation…"
+          source /venv/bin/activate
+          pip install --quiet --no-cache-dir bert-score==0.3.13
+
+          python -u /sciclone/home/thwalsh/hypernets/training_scripts/evaluate_hypernet_10000.py \
+            --test_parquet /tmp/test_full_10000.parquet \
+            --global_features_parquet /tmp/global_features_10000.parquet \
+            $( [ "${HIERARCHICAL_HYPERNET}" = "true" ] && \
+               echo "--instance_features_parquet /tmp/instance_features_10000.parquet" ) \
+            --base_ckpt /sciclone/home/thwalsh/hypernets/base_models/pythia_125m_clean \
+            --model_root /sciclone/home/thwalsh/hypernets/models \
+            --results_dir /sciclone/home/thwalsh/hypernets/results \
+            --log_dir /sciclone/home/thwalsh/hypernets/log_files \
+            --checklist /sciclone/home/thwalsh/hypernets/log_files/eval_hypernet_checklist_10000.txt \
+            --bsz 8 \
+            --variants "lora" \
+            $( [ "${DEMO_MODE}" = "true" ] && echo "--demo_mode --sanity_checks" ) \
+            $( [ "${HIERARCHICAL_HYPERNET}" = "true" ] && echo "--hierarchical_hypernet" || echo "--flat_hypernet" ) \
+            $( [ "${DO_FEATURE_PERM}" = "true" ] && echo "--feature_permutation" ) \
+            2>&1 | tee /sciclone/home/thwalsh/hypernets/log_files/evaluate_hypernet_10000.log
+
+          echo "Evaluation finished."

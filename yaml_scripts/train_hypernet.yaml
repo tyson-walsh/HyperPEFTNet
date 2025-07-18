@@ -1,0 +1,100 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: train-hypernet-10000
+  namespace: thwalsh
+spec:
+  securityContext:
+    runAsUser: 264391
+    runAsGroup: 1132
+  restartPolicy: Never
+  nodeSelector:
+    nvidia.com/gpu.product: NVIDIA-A40
+
+  volumes:
+    - name: home-vol
+      nfs:
+        server: 128.239.56.166
+        path: /sciclone/home/thwalsh
+    - name: local-vol
+      emptyDir: {}
+
+  containers:
+    - name: train-hypernet-10000-container
+      image: ghcr.io/tyson-walsh/hypernets-pip-slim:v12
+      imagePullPolicy: Always
+
+      resources:
+        requests:
+          memory: "64Gi"
+          cpu: "8"
+          nvidia.com/gpu: "2"
+        limits:
+          memory: "96Gi"
+          cpu: "24"
+          nvidia.com/gpu: "2"
+
+      volumeMounts:
+        - name: home-vol
+          mountPath: /sciclone/home/thwalsh
+        - name: local-vol
+          mountPath: /tmp
+
+      workingDir: /
+
+      env:
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0,1"
+        - name: HIERARCHICAL_HYPERNET          # "true" → hierarchical, "false" → flat
+          value: "false"
+        - name: UNCLAMP_STEPS
+          value: "3000"
+        - name: USE_GRAD_CKPT
+          value: "false"
+        - name: DEMO_MODE
+          value: "false"
+        - name: WARM_START_LORA_CKPT
+          value: "/sciclone/home/thwalsh/hypernets/models/nonhypernet_lora_model_10000/peft_placeholders.safetensors"
+        - name: BEST_HYPER_JSON
+          value: "/sciclone/home/thwalsh/hypernets/results/opt_hypernet_lora_10000.json"
+        - name: MODELS_SUBDIR
+          value: "demo_runs"
+        - name: CUBLAS_WORKSPACE_CONFIG        # deterministic cuBLAS
+          value: ":4096:8"
+        - name: PYTHONWARNINGS
+          value: "ignore"
+
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+          set -ex
+          echo "Staging Parquet splits to /tmp (NVMe)…"
+          cp -a /sciclone/home/thwalsh/hypernets/data/train_full_10000.parquet \
+                /sciclone/home/thwalsh/hypernets/data/val_full_10000.parquet \
+                /tmp/
+          if [ "${HIERARCHICAL_HYPERNET}" = "true" ]; then
+              cp -a /sciclone/home/thwalsh/hypernets/data/instance_features_10000.parquet /tmp/
+          fi
+
+          echo "Starting Dual-GPU Hypernetwork Training…"
+          source /venv/bin/activate
+
+          python -u /sciclone/home/thwalsh/hypernets/training_scripts/train_hypernet_10000.py \
+            --train_parquet            /tmp/train_full_10000.parquet \
+            --val_parquet              /tmp/val_full_10000.parquet   \
+            --global_features_parquet  /dev/null \
+            --base_ckpt                /sciclone/home/thwalsh/hypernets/base_models/pythia_125m_clean \
+            --models_output_dir        /sciclone/home/thwalsh/hypernets/models \
+            --best_hyper_json          ${BEST_HYPER_JSON} \
+            --unclamp_steps            ${UNCLAMP_STEPS} \
+            --disable_gstats           'gstat_user_sent_mean,gstat_gap_sentiment,gstat_user_sent_var,gstat_user_len_mean,gstat_user_ttr,gstat_user_post_rate,gstat_punct_ratio,gstat_question_ratio,gstat_caps_ratio,gstat_profanity_ratio,gstat_firstperson_ratio,gstat_weekend_ratio,gstat_link_ratio,gstat_reply_delay_mean,gstat_hour_hist' \
+            $( [ "${HIERARCHICAL_HYPERNET}" = "true" ] && \
+               echo "--instance_features_parquet /tmp/instance_features_10000.parquet --hierarchical_hypernet" || \
+               echo "--flat_hypernet" ) \
+            $( [ "${USE_GRAD_CKPT}" = "true" ] && echo "--use_grad_ckpt" ) \
+            $( [ "${DEMO_MODE}" = "true" ] && echo "--demo_mode" ) \
+            --warm_start_lora_ckpt     ${WARM_START_LORA_CKPT} \
+            2>&1 | tee /sciclone/home/thwalsh/hypernets/log_files/train_hypernet_10000.log
+
+          echo "Training completed."
+          ls -lh /sciclone/home/thwalsh/hypernets/models

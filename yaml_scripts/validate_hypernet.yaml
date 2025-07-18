@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: validate-hypernet-10000
+  namespace: thwalsh
+spec:
+  securityContext:
+    runAsUser: 264391
+    runAsGroup: 1132
+  restartPolicy: Never
+  nodeSelector:
+    nvidia.com/gpu.product: NVIDIA-A40
+
+  volumes:
+    - name: home-vol
+      nfs:
+        server: 128.239.56.166
+        path: /sciclone/home/thwalsh
+    - name: local-vol               # tmpfs scratch
+      emptyDir: {}
+
+  containers:
+    - name: validate-hypernet-10000-container
+      image: ghcr.io/tyson-walsh/hypernets-pip-slim:v12
+      imagePullPolicy: Always
+
+      resources:
+        requests:
+          memory: "27Gi"
+          cpu: "8"
+          nvidia.com/gpu: "1"
+        limits:
+          memory: "64Gi"
+          cpu: "16"
+          nvidia.com/gpu: "1"
+
+      volumeMounts:
+        - name: home-vol
+          mountPath: /sciclone/home/thwalsh
+        - name: local-vol
+          mountPath: /tmp
+
+      workingDir: /
+
+      env:
+        - name: PEFT_VARIANT           # lora | lora_warm | adapter | bias | prefix
+          value: "lora"
+        - name: PROBE_TYPE
+          value: "offset,hidden,gvec,b5"
+        - name: PERPLEXITIES           # t-SNE perplexities
+          value: "30,50,100"
+        - name: USE_UMAP
+          value: "true"
+        - name: DEMO_MODE
+          value: "false"
+        - name: LABELS_CSV             # <-- our rage / empath (or OCEAN if we decide to do that later) labels
+          value: "/sciclone/home/thwalsh/hypernets/data/my_labels.csv"
+
+        # one-liner CUDA / Python env tweaks
+        - name: CUBLAS_WORKSPACE_CONFIG
+          value: ":4096:8"
+        - name: PYTHONWARNINGS
+          value: "ignore"
+
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+          set -ex
+          echo "Starting Hyper-network validation …"
+          source /venv/bin/activate
+
+          python -u /sciclone/home/thwalsh/hypernets/training_scripts/validate_hypernet_10000.py \
+            --variant "${PEFT_VARIANT}" \
+            --probe "${PROBE_TYPE}" \
+            --perplexities "${PERPLEXITIES}" \
+            --test_parquet /sciclone/home/thwalsh/hypernets/data/test_data_10000_300.parquet \
+            --global_features /sciclone/home/thwalsh/hypernets/data/global_features_10000.parquet \
+            --base_ckpt /sciclone/home/thwalsh/hypernets/base_models/pythia_125m_clean \
+            --models_dir /sciclone/home/thwalsh/hypernets/models \
+            --results_dir /sciclone/home/thwalsh/hypernets/results \
+            --log_dir /sciclone/home/thwalsh/hypernets/log_files \
+            --checklist /sciclone/home/thwalsh/hypernets/log_files/validation_hypernet_checklist_10000.txt \
+            --labels_csv "${LABELS_CSV}" \
+            $( [[ "${USE_UMAP}" == "true" ]] && echo --use_umap ) \
+            $( [[ "${DEMO_MODE}" == "true" ]] && echo --demo_mode )
+
+          echo "Validation finished."

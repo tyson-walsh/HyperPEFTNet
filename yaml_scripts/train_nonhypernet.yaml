@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: train-nonhypernet-10000
+  namespace: thwalsh
+spec:
+  securityContext:
+    runAsUser: 264391
+    runAsGroup: 1132
+  restartPolicy: Never
+  nodeSelector:
+    nvidia.com/gpu.product: NVIDIA-A40
+
+  volumes:
+    - name: home-vol
+      nfs:
+        server: 128.239.56.166
+        path: /sciclone/home/thwalsh
+    - name: local-vol
+      emptyDir: {}
+
+  containers:
+    - name: train-nonhypernet-10000-container
+      image: ghcr.io/tyson-walsh/hypernets-pip-slim:v12
+      imagePullPolicy: Always
+      resources:
+        requests:
+          memory: "24Gi"
+          cpu: "8"
+          nvidia.com/gpu: "1"
+        limits:
+          memory: "64Gi"
+          cpu: "16"
+          nvidia.com/gpu: "1"
+      volumeMounts:
+        - name: home-vol
+          mountPath: /sciclone/home/thwalsh
+        - name: local-vol
+          mountPath: /tmp
+      env:
+        - name: CUBLAS_WORKSPACE_CONFIG   # silences CuBLAS determinism spam
+          value: ":4096:8"
+        - name: PYTHONWARNINGS            # mute deprecation chatter
+          value: "ignore"
+      workingDir: /
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+          set -ex
+
+          # ---------- Stage Parquets to local NVMe ----------
+          echo "Staging Parquet splits to /tmp (NVMe) …"
+          cp -a /sciclone/home/thwalsh/hypernets/data/train_data_10000.parquet \
+                /sciclone/home/thwalsh/hypernets/data/val_data_10000.parquet   \
+                /tmp/
+
+          echo "Starting single-GPU NON-hypernetwork training..."
+          source /venv/bin/activate
+
+          python /sciclone/home/thwalsh/hypernets/training_scripts/train_nonhypernet_10000.py \
+            --train_parquet /tmp/train_data_10000.parquet \
+            --val_parquet   /tmp/val_data_10000.parquet \
+            --base_ckpt     /sciclone/home/thwalsh/hypernets/base_models/pythia_125m_clean \
+            --models_output_dir /sciclone/home/thwalsh/hypernets/models \
+            > /sciclone/home/thwalsh/hypernets/log_files/train_nonhypernet_10000.log 2>&1
+
+          echo "Training completed."
+          ls -lh /sciclone/home/thwalsh/hypernets/models
