@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-hierarchical_hypernetwork_10000.py
+hierarchical_hypernetwork.py
 ==================================
 
 A **hierarchical hyper-network** that learns additive PEFT offsets **δθ**

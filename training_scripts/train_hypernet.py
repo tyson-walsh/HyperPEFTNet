@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-train_hypernet_10000.py
+train_hypernet.py
 =======================
 
 Multi-GPU training harness for **five** PEFT backbones
@@ -63,13 +63,13 @@ other four.
 Where It Fits in the Ablation Study
 -----------------------------------
 The script produces hyper-net checkpoints **and** their IG/SHAP
-vectors.  *evaluate_hypernet_10000.py* later benchmarks perplexity and
+vectors.  *evaluate_hypernet.py* later benchmarks perplexity and
 qualitative metrics, re-using these saved deltas.
 
 Implementation Outline
 ----------------------
 1. Parse CLI → load train/val Parquet + optional feature tables.  
-2. Build *HypernetConversationDataset10000* with author-level features
+2. Build *HypernetConversationDataset* with author-level features
    (59D static + 385D dynamic) and optional reply-level features (5D).  
 3. **For each PEFT variant**  
      • instantiate frozen backbone, patch with PEFT placeholders,  
@@ -117,8 +117,8 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.extend([str(ROOT / "data_scripts"), str(ROOT / "PEFT_scripts")])
 
-from hypernetwork_dataset_10000 import HypernetConversationDataset10000  # noqa: E402
-from hierarchical_hypernetwork_10000 import (                            # noqa: E402
+from hypernetwork_dataset import HypernetConversationDataset  # noqa: E402
+from hierarchical_hypernetwork import (                            # noqa: E402
     HierarchicalHypernetwork,
     PEFTHypernetModel,
     G_SIGNALS,
@@ -176,7 +176,7 @@ DEFAULT_MAX_CLAMP = 1.00
 DEFAULT_UNCLAMP_STEPS = 3000
 
 DEFAULT_BEST_JSON_PATH = (
-    "/sciclone/home/thwalsh/hypernets/results/opt_hypernet_lora_10000.json"
+    "/sciclone/home/thwalsh/hypernets/results/opt_hypernet_lora.json"
 )
 
 # --------------------------------------------------------------------------- #
@@ -726,7 +726,7 @@ def main() -> None:
     ap.add_argument("--train_parquet", required=True)
     ap.add_argument("--val_parquet", required=True)
     ap.add_argument("--base_ckpt", required=True)
-    ap.add_argument("--best_hyper_json", default=DEFAULT_BEST_JSON_PATH, help="Path to opt_hypernet_lora_10000.json",)
+    ap.add_argument("--best_hyper_json", default=DEFAULT_BEST_JSON_PATH, help="Path to opt_hypernet_lora.json",)
     ap.add_argument("--models_output_dir", required=True)
     ap.add_argument("--train_steps", type=int, default=10_000)
     ap.add_argument("--batch_size", type=int, default=48)
@@ -736,7 +736,7 @@ def main() -> None:
     ap.add_argument("--max_len", type=int, default=512)
     ap.add_argument("--log_interval", type=int, default=500)
     ap.add_argument("--fp32", action="store_true")
-    ap.add_argument("--checklist", default="/sciclone/home/thwalsh/hypernets/log_files/train_hypernet_checklist_10000.txt",)
+    ap.add_argument("--checklist", default="/sciclone/home/thwalsh/hypernets/log_files/train_hypernet_checklist.txt",)
     ap.add_argument("--global_features_parquet")
     ap.add_argument("--disable_gstats")
     ap.add_argument("--instance_features_parquet")
@@ -826,10 +826,10 @@ def main() -> None:
         else []
     )
 
-    ds_tr = HypernetConversationDataset10000(
+    ds_tr = HypernetConversationDataset(
         df_tr, tok, gdf, idf, hierarchical=args.hierarchical_hypernet, max_length=args.max_len
     )
-    ds_val = HypernetConversationDataset10000(
+    ds_val = HypernetConversationDataset(
         df_val, tok, gdf, idf, hierarchical=args.hierarchical_hypernet, max_length=args.max_len
     )
     ds_tr.set_selected_features(gcols, icols)
@@ -1010,7 +1010,7 @@ def main() -> None:
                 _theta_bar_device_fix, with_kwargs=True
             )
         tag = "hier_hypernet" if args.hierarchical_hypernet else "flat_hypernet"
-        vdir = out_root / f"{tag}_{variant}_model_10000"
+        vdir = out_root / f"{tag}_{variant}_model"
         vdir.mkdir(parents=True, exist_ok=True)
 
         def _do_save(m: PEFTHypernetModel) -> None:
@@ -1055,7 +1055,7 @@ def main() -> None:
     # ---------------------------------------------------------------------
     for variant in variant_list:
         tag  = "hier_hypernet" if args.hierarchical_hypernet else "flat_hypernet"
-        vdir = out_root / f"{tag}_{variant}_model_10000"
+        vdir = out_root / f"{tag}_{variant}_model"
         if not vdir.exists():
             logging.warning("[%s] no checkpoint – skipping eval", variant)
             continue

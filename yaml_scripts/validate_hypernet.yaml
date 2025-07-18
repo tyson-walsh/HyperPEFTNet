@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: validate-hypernet-10000
+  name: validate-hypernet
   namespace: thwalsh
 spec:
   securityContext:
@@ -69,17 +69,17 @@ spec:
           echo "Starting Hyper-network validation …"
           source /venv/bin/activate
 
-          python -u /sciclone/home/thwalsh/hypernets/training_scripts/validate_hypernet_10000.py \
+          python -u /sciclone/home/thwalsh/hypernets/training_scripts/validate_hypernet.py \
             --variant "${PEFT_VARIANT}" \
             --probe "${PROBE_TYPE}" \
             --perplexities "${PERPLEXITIES}" \
-            --test_parquet /sciclone/home/thwalsh/hypernets/data/test_data_10000_300.parquet \
-            --global_features /sciclone/home/thwalsh/hypernets/data/global_features_10000.parquet \
+            --test_parquet /sciclone/home/thwalsh/hypernets/data/test_data_300.parquet \
+            --global_features /sciclone/home/thwalsh/hypernets/data/global_features.parquet \
             --base_ckpt /sciclone/home/thwalsh/hypernets/base_models/pythia_125m_clean \
             --models_dir /sciclone/home/thwalsh/hypernets/models \
             --results_dir /sciclone/home/thwalsh/hypernets/results \
             --log_dir /sciclone/home/thwalsh/hypernets/log_files \
-            --checklist /sciclone/home/thwalsh/hypernets/log_files/validation_hypernet_checklist_10000.txt \
+            --checklist /sciclone/home/thwalsh/hypernets/log_files/validation_hypernet_checklist.txt \
             --labels_csv "${LABELS_CSV}" \
             $( [[ "${USE_UMAP}" == "true" ]] && echo --use_umap ) \
             $( [[ "${DEMO_MODE}" == "true" ]] && echo --demo_mode )

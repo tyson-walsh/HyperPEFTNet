@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-validate_hypernet_10000.py
+validate_hypernet.py
 ==========================
 
 Offline validation suite for hyper-network–conditioned PEFT models
@@ -55,8 +55,8 @@ Per-variant / per-probe directory:
 • ``tsne.png`` / ``umap.png`` scatter plots  
 • ``probe_report.txt`` linear-probe performance summary  
 
-Checklist guard → ``log_files/validation_hypernet_checklist_10000.txt``  
-Central log   → ``log_files/validate_hypernet_10000.log``
+Checklist guard → ``log_files/validation_hypernet_checklist.txt``  
+Central log   → ``log_files/validate_hypernet.log``
 
 Probe Vectors
 -------------
@@ -141,7 +141,7 @@ import matplotlib.pyplot as plt
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.extend([str(ROOT / "data_scripts"), str(ROOT / "PEFT_scripts")])
 
-from hierarchical_hypernetwork_10000 import (
+from hierarchical_hypernetwork import (
     HierarchicalHypernetwork,
     PEFTHypernetModel,
     G_SIGNALS,
@@ -302,10 +302,10 @@ def _attach(
         ckpt_dir = root
     else:
         search = [
-            root / f"hier_hypernet_{variant}_model_10000",
-            root / f"flat_hypernet_{variant}_model_10000",
-            root / f"hier_hypernet_{variant}_10000",
-            root / f"flat_hypernet_{variant}_10000",
+            root / f"hier_hypernet_{variant}_model",
+            root / f"flat_hypernet_{variant}_model",
+            root / f"hier_hypernet_{variant}",
+            root / f"flat_hypernet_{variant}",
         ]
         ckpt_dir = next(p for p in search if p.is_dir())
 
@@ -761,7 +761,7 @@ def main() -> None:
     ap.add_argument("--labels_csv", required=True)
     ap.add_argument("--seed", type=int, default=142)
     ap.add_argument("--demo_mode", action="store_true")
-    ap.add_argument("--checklist", default="log_files/validation_hypernet_checklist_10000.txt")
+    ap.add_argument("--checklist", default="log_files/validation_hypernet_checklist.txt")
     ap.add_argument("--log_dir", default="log_files")
     ap.add_argument("--min_norm", type=float, default=1e-6)
     ap.add_argument("--unseen_trait", default="")
@@ -771,7 +771,7 @@ def main() -> None:
     _RESULT_ROOT = Path(args.results_dir) / "embedding_analysis"
     _RESULT_ROOT.mkdir(parents=True, exist_ok=True)
     Path(args.log_dir).mkdir(parents=True, exist_ok=True)
-    _configure_logging(Path(args.log_dir) / "validate_hypernet_10000.log")
+    _configure_logging(Path(args.log_dir) / "validate_hypernet.log")
     hf_utils.logging.set_verbosity_error()
 
     set_seed(args.seed)
@@ -787,9 +787,9 @@ def main() -> None:
     gdf = pd.read_parquet(args.global_features).fillna(0.0)
     tok = AutoTokenizer.from_pretrained(args.base_ckpt, local_files_only=True)
 
-    ck_root = Path(args.models_dir) / f"flat_hypernet_{args.variant}_model_10000"
+    ck_root = Path(args.models_dir) / f"flat_hypernet_{args.variant}_model"
     if not ck_root.exists():
-        ck_root = Path(args.models_dir) / f"flat_hypernet_{args.variant}_10000"
+        ck_root = Path(args.models_dir) / f"flat_hypernet_{args.variant}"
 
     cols_file = ck_root / "gfeat_columns.json"
     gcols_used = json.loads(cols_file.read_text()) if cols_file.exists() else G_SIGNALS.copy()

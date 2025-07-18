@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-dataset_10000.py
+dataset.py
 ================
 A modular PyTorch `Dataset` for the cleaned Reddit corpus comprising
 10 000 target users.  It builds (context → next-turn) training tuples and
@@ -30,7 +30,7 @@ Implementation Outline
 2.  Drop malformed groups (empty context or target).
 3.  Tokenise on-the-fly (or cache) and return tensors ready for
     `nn.CrossEntropyLoss` (–100 on `[PAD]` tokens).
-4.  `python dataset_10000.py --parquet <file>` runs a smoke-test that
+4.  `python dataset.py --parquet <file>` runs a smoke-test that
     prints class counts, token-length stats, and basic sanity checks.
 """
 
@@ -52,7 +52,7 @@ from transformers import AutoTokenizer, PreTrainedTokenizer
 # --------------------------------------------------------------------------- #
 #                              Dataset definition
 # --------------------------------------------------------------------------- #
-class RedditConversationDataset10000(Dataset):
+class RedditConversationDataset(Dataset):
     """
     Returns dictionaries:
 
@@ -156,7 +156,7 @@ class RedditConversationDataset10000(Dataset):
 # --------------------------------------------------------------------------- #
 #                               Smoke-test logic
 # --------------------------------------------------------------------------- #
-def _smoke_test(df: pd.DataFrame, ds: RedditConversationDataset10000, tok: PreTrainedTokenizer):
+def _smoke_test(df: pd.DataFrame, ds: RedditConversationDataset, tok: PreTrainedTokenizer):
     n_samples = len(ds)
     n_users = df["target_user_id"].nunique()
     per_user = Counter(map(int, df["target_user_id"]))
@@ -205,7 +205,7 @@ def _smoke_test(df: pd.DataFrame, ds: RedditConversationDataset10000, tok: PreTr
 # --------------------------------------------------------------------------- #
 #                                   CLI
 # --------------------------------------------------------------------------- #
-DEFAULT_PARQUET = "/sciclone/home/thwalsh/hypernets/data/train_data_10000.parquet"
+DEFAULT_PARQUET = "/sciclone/home/thwalsh/hypernets/data/train_data.parquet"
 DEFAULT_TOKENIZER = "/sciclone/home/thwalsh/hypernets/base_models/pythia_125m_clean"
 
 if __name__ == "__main__":
@@ -247,7 +247,7 @@ if __name__ == "__main__":
         tok.add_special_tokens({"pad_token": "[PAD]"})
         tok.pad_token_id = tok.convert_tokens_to_ids("[PAD]")
 
-    ds = RedditConversationDataset10000(
+    ds = RedditConversationDataset(
         dataframe=df_raw,
         tokenizer=tok,
         max_length=args.max_len,

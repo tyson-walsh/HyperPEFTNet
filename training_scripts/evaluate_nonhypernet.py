@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-evaluate_nonhypernet_10000.py
+evaluate_nonhypernet.py
 =============================
 
 Offline evaluation for the **five** non-hyper-network checkpoints
@@ -21,15 +21,15 @@ hyper-network evaluation pipeline **except** that:
 
 What the script produces
 ------------------------
-* **Per-variant JSON** – ``results/eval_nonhypernet_{variant}_10000.json``  
+* **Per-variant JSON** – ``results/eval_nonhypernet_{variant}.json``  
   ‣ a *summary* block with scalar metrics  
   ‣ the **top-10** generations (ranked by BERTScore, BLEU tie-break)
     including their individual metrics  
-* **Combined JSON** – ``results/eval_nonhypernet_results_10000.json``  
+* **Combined JSON** – ``results/eval_nonhypernet_results.json``  
   containing only the summary blocks.  
 * **Checklist file** – updated after each variant completes to prevent
   accidental re-runs.  
-* **Central log** – ``log_files/evaluate_nonhypernet_10000.log``.  
+* **Central log** – ``log_files/evaluate_nonhypernet.log``.  
 
 Metrics computed
 ----------------
@@ -52,9 +52,9 @@ Lexical diversity
 
 Implementation outline
 ----------------------
-1. Restore each checkpoint from ``models/nonhypernet_{variant}_model_10000``  
+1. Restore each checkpoint from ``models/nonhypernet_{variant}_model``  
    (placeholders merged into a frozen backbone; *base* fully unfrozen).  
-2. Load the test split via ``RedditConversationDataset10000``  
+2. Load the test split via ``RedditConversationDataset``  
    (no global/instance feature tensors).  
 3. **Generation** – top-p sampling (``p=0.95``, temperature 0.8,
    repetition-penalty 1.1) of up to **64** new tokens; prompts are the
@@ -119,7 +119,7 @@ except NameError:
     ROOT = Path.cwd()
 sys.path.extend([str(ROOT / "data_scripts"), str(ROOT / "PEFT_scripts")])
 
-from dataset_10000 import RedditConversationDataset10000          # noqa: E402
+from dataset import RedditConversationDataset          # noqa: E402
 from adapter import ModelAdapter                                  # noqa: E402
 from bias import BiasTuningModel                                  # noqa: E402
 from lora import LoRAQKV                                          # noqa: E402
@@ -294,7 +294,7 @@ def main() -> None:
     args, _ = p.parse_known_args()
 
     Path(args.log_dir).mkdir(parents=True, exist_ok=True)
-    log_path = Path(args.log_dir) / "evaluate_nonhypernet_10000.log"
+    log_path = Path(args.log_dir) / "evaluate_nonhypernet.log"
     fh = logging.FileHandler(log_path, mode="a"); fh.setLevel(logging.INFO)
     ch = logging.StreamHandler(sys.stdout);      ch.setLevel(logging.INFO)
     logging.basicConfig(
@@ -338,7 +338,7 @@ def main() -> None:
     if tok.pad_token_id is None:
         tok.add_special_tokens({"pad_token": "[PAD]"})
 
-    ds = RedditConversationDataset10000(df_test, tok, max_length=args.max_len)
+    ds = RedditConversationDataset(df_test, tok, max_length=args.max_len)
 
     loader = DataLoader(
         ds,
@@ -362,7 +362,7 @@ def main() -> None:
             if variant in done_variants:
                 logging.info("[%s] already done – skip", variant)
                 if not _disable_io:
-                    prev_path = results_dir / f"eval_nonhypernet_{variant}_10000.json"
+                    prev_path = results_dir / f"eval_nonhypernet_{variant}.json"
                     if prev_path.is_file():
                         try:
                             with prev_path.open() as fh:
@@ -371,7 +371,7 @@ def main() -> None:
                             logging.warning("[%s] could not read previous summary: %s", variant, e)
                 continue
 
-            ck_dir = Path(args.models_dir) / f"nonhypernet_{variant}_model_10000"
+            ck_dir = Path(args.models_dir) / f"nonhypernet_{variant}_model"
             if not ck_dir.exists():
                 logging.warning("[%s] checkpoint missing – skip", variant)
                 continue
@@ -557,7 +557,7 @@ def main() -> None:
             )
 
             if not _disable_io:
-                v_path = results_dir / f"eval_nonhypernet_{variant}_10000.json"
+                v_path = results_dir / f"eval_nonhypernet_{variant}.json"
                 json.dump(
                     {variant: {"summary": summary, "samples": top_records}},
                     v_path.open("w"),
@@ -583,7 +583,7 @@ def main() -> None:
             _parquet_writer.close()
 
     if not _disable_io and combined:
-        comb_path = results_dir / "eval_nonhypernet_results_10000.json"
+        comb_path = results_dir / "eval_nonhypernet_results.json"
         json.dump(combined, comb_path.open("w"), indent=2)
         logging.info("Combined summary → %s", comb_path)
     elif _disable_io:

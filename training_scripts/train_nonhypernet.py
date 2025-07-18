@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-train_nonhypernet_10000.py
+train_nonhypernet.py
 ==========================
 
 Single‑GPU training of five nonhypernet-baselines — LoRA, Adapter, Bias‑only, Prefix,
@@ -21,7 +21,7 @@ AdamW, **3% warm‑up** → cosine decay to 0.
 
 Implementation Outline
 ----------------------
-1. Parse CLI; build `RedditConversationDataset10000`.
+1. Parse CLI; build `RedditConversationDataset`.
 2. For each variant  
   • freeze backbone (except *base*), insert PEFT wrapper,  
   • enable gradient checkpointing when available,  
@@ -97,7 +97,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.extend([str(ROOT / "data_scripts"), str(ROOT / "PEFT_scripts")])
 OPT_DIR_DEFAULT = "/sciclone/home/thwalsh/hypernets/results"
 
-from dataset_10000 import RedditConversationDataset10000  # noqa: E402
+from dataset import RedditConversationDataset  # noqa: E402
 from adapter import ModelAdapter  # noqa: E402
 from bias import BiasTuningModel  # noqa: E402
 from lora import LoRAQKV  # noqa: E402
@@ -421,7 +421,7 @@ def _train(
 
 
 def _load_optuna_lr(opt_dir: str, variant: str, default: float) -> float:
-    p = Path(opt_dir) / f"opt_hypernet_{variant}_10000.json"
+    p = Path(opt_dir) / f"opt_hypernet_{variant}.json"
     if p.is_file():
         try:
             return json.loads(p.read_text())[variant]["best_trial"]["lr"]
@@ -448,7 +448,7 @@ def main() -> None:
     ap.add_argument("--opt_results_dir", default=OPT_DIR_DEFAULT)
     ap.add_argument(
         "--checklist",
-        default="/sciclone/home/thwalsh/hypernets/log_files/train_nonhypernet_checklist_10000.txt",
+        default="/sciclone/home/thwalsh/hypernets/log_files/train_nonhypernet_checklist.txt",
     )
     args = ap.parse_args()
 
@@ -476,8 +476,8 @@ def main() -> None:
         tok.add_special_tokens({"pad_token": "[PAD]"})
         tok.pad_token_id = tok.convert_tokens_to_ids("[PAD]")
 
-    ds_tr = RedditConversationDataset10000(df_tr, tok, max_length=args.max_len)
-    ds_val = RedditConversationDataset10000(df_val, tok, max_length=args.max_len)
+    ds_tr = RedditConversationDataset(df_tr, tok, max_length=args.max_len)
+    ds_val = RedditConversationDataset(df_val, tok, max_length=args.max_len)
 
     dl_tr = DataLoader(ds_tr, batch_size=args.batch_size, shuffle=True, num_workers=2, pin_memory=(device.type == "cuda"))
     dl_val = DataLoader(ds_val, batch_size=args.batch_size, shuffle=False, num_workers=2, pin_memory=(device.type == "cuda"))
@@ -544,7 +544,7 @@ def main() -> None:
             stats["elapsed"],
         )
 
-        vdir = out_root / f"nonhypernet_{variant}_model_10000"
+        vdir = out_root / f"nonhypernet_{variant}_model"
         vdir.mkdir(parents=True, exist_ok=True)
 
         if variant == "base":

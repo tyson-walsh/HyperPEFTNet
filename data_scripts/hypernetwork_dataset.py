@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-hypernetwork_dataset_10000.py
+hypernetwork_dataset.py
 =============================
 
 A wrapper that joins tokenized Reddit context–response pairs with flattened
@@ -32,11 +32,6 @@ INSTANCE-DYNAMIC <one row per reply>
     idyn_user_post_rate                 short-term author cadence
     idyn_semantic_shift                 cosine distance to context
 
-The dataset also returns an integer ``mbti_label`` (0–15, −1 if missing) so an
-auxiliary MBTI loss can be enabled during training.  Only one MBTI code and
-one dominant OCEAN facet exist per target user; the underlying *\*_full_10000_v2.parquet*
-splits guarantee this property.
-
 quick_feature_extract
 ---------------------
 Builds the 30-D global vector on the fly from raw text only.
@@ -54,16 +49,6 @@ Column layout (N, 30):
     29    gstat_user_subreddit_entropy (0.0)
 
 All rows are padded with zeros; no NaNs are produced.
-
-Smoke-test CLI
---------------
-Run the file directly to verify dimensionalities and basic statistics:
-
-    $ python hypernetwork_dataset_10000.py --pretok --hierarchical
-
-By default the script loads
-*/sciclone/home/thwalsh/hypernets/data/train_full_10000_v2.parquet* together
-with the matching global and instance feature tables.
 """
 from __future__ import annotations
 
@@ -125,18 +110,18 @@ def _load_base_dataset() -> type:
     search_paths.append(Path("/sciclone/home/thwalsh/hypernets/data_scripts"))
 
     for directory in search_paths:
-        cand = directory / "dataset_10000.py"
+        cand = directory / "dataset.py"
         if cand.exists():
-            spec = importlib.util.spec_from_file_location("dataset_10000", str(cand))
+            spec = importlib.util.spec_from_file_location("dataset", str(cand))
             mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
             assert spec.loader is not None
             spec.loader.exec_module(mod)  # type: ignore[arg-type]
-            sys.modules["dataset_10000"] = mod
-            return mod.RedditConversationDataset10000  # type: ignore[attr-defined]
-    raise ModuleNotFoundError("dataset_10000.py not found")
+            sys.modules["dataset"] = mod
+            return mod.RedditConversationDataset  # type: ignore[attr-defined]
+    raise ModuleNotFoundError("dataset.py not found")
 
 
-RedditConversationDataset10000 = _load_base_dataset()
+RedditConversationDataset = _load_base_dataset()
 
 # ---------- helper utilities -------------------------------------------
 _ACT2ID = {"statement": 0, "question": 1, "gratitude": 2, "other": 3}
@@ -163,7 +148,7 @@ def _flatten_numeric(v) -> List[float]:
 
 
 # ---------- dataset wrapper --------------------------------------------
-class HypernetConversationDataset10000(Dataset):
+class HypernetConversationDataset(Dataset):
     _sent_pipe = None  # shared HF sentiment pipeline
     _pers_pipe = None  # shared HF personality pipeline
 
@@ -183,7 +168,7 @@ class HypernetConversationDataset10000(Dataset):
         self.hierarchical = bool(hierarchical)
 
         # token / text part
-        self._text_ds = RedditConversationDataset10000(
+        self._text_ds = RedditConversationDataset(
             dataframe=df,
             tokenizer=tokenizer,
             max_length=max_length,
@@ -222,16 +207,16 @@ class HypernetConversationDataset10000(Dataset):
         import numpy as _np, torch as _torch
         from transformers import pipeline as _pipe
 
-        if HypernetConversationDataset10000._sent_pipe is None:
-            HypernetConversationDataset10000._sent_pipe = _pipe(
+        if HypernetConversationDataset._sent_pipe is None:
+            HypernetConversationDataset._sent_pipe = _pipe(
                 "sentiment-analysis",
                 model="/sciclone/home/thwalsh/hypernets/models/distilbert-sst2",
                 tokenizer="/sciclone/home/thwalsh/hypernets/models/distilbert-sst2",
                 device=0 if _torch.cuda.is_available() else -1,
                 return_all_scores=True,
             )
-        if HypernetConversationDataset10000._pers_pipe is None:
-            HypernetConversationDataset10000._pers_pipe = _pipe(
+        if HypernetConversationDataset._pers_pipe is None:
+            HypernetConversationDataset._pers_pipe = _pipe(
                 "text-classification",
                 model="/sciclone/home/thwalsh/hypernets/models/Personality_LM",
                 tokenizer="/sciclone/home/thwalsh/hypernets/models/Personality_LM",
@@ -242,14 +227,14 @@ class HypernetConversationDataset10000(Dataset):
         N = len(texts)
         rows = _np.zeros((N, 9), dtype=_np.float32)  # 5 OCEAN + 4 sentiment/placeholder
 
-        sent = HypernetConversationDataset10000._sent_pipe(
+        sent = HypernetConversationDataset._sent_pipe(
             texts, batch_size=32, truncation=True, max_length=256
         )
         pos_prob = _np.array([row[1]["score"] for row in sent], _np.float32)
         rows[:, 5] = pos_prob
         rows[:, 6] = pos_prob - 0.5  # centered sentiment
 
-        pers_logits = HypernetConversationDataset10000._pers_pipe(
+        pers_logits = HypernetConversationDataset._pers_pipe(
             texts, batch_size=32, truncation=True, max_length=64
         )
         logits = _np.array([[p["score"] for p in r] for r in pers_logits], _np.float32)
@@ -386,17 +371,17 @@ if __name__ == "__main__":
     ap.add_argument(
         "--parquet",
         type=Path,
-        default=_DEFAULT_ROOT / "train_full_10000_v2.parquet",
+        default=_DEFAULT_ROOT / "train_full_v2.parquet",
     )
     ap.add_argument(
         "--global_parquet",
         type=Path,
-        default=_DEFAULT_ROOT / "global_features_10000.parquet",
+        default=_DEFAULT_ROOT / "global_features.parquet",
     )
     ap.add_argument(
         "--instance_parquet",
         type=Path,
-        default=_DEFAULT_ROOT / "instance_features_10000.parquet",
+        default=_DEFAULT_ROOT / "instance_features.parquet",
     )
     ap.add_argument(
         "--tokenizer",
@@ -427,7 +412,7 @@ if __name__ == "__main__":
         tok.add_special_tokens({"pad_token": "[PAD]"})
         tok.pad_token_id = tok.convert_tokens_to_ids("[PAD]")
 
-    ds = HypernetConversationDataset10000(
+    ds = HypernetConversationDataset(
         df=df,
         tokenizer=tok,
         global_features_df=gdf,

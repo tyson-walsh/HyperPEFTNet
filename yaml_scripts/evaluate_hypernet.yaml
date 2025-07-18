@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: evaluate-hypernet-10000
+  name: evaluate-hypernet
   namespace: thwalsh
 spec:
   securityContext:
@@ -18,7 +18,7 @@ spec:
     - name: local-vol
       emptyDir: {}
   containers:
-    - name: evaluate-hypernet-10000-container
+    - name: evaluate-hypernet-container
       image: ghcr.io/tyson-walsh/hypernets-pip-slim:v12
       imagePullPolicy: Always
       resources:
@@ -55,31 +55,31 @@ spec:
           set -ex
 
           echo "Staging evaluation Parquet files to /tmp (NVMe)…"
-          cp -a /sciclone/home/thwalsh/hypernets/data/test_full_10000.parquet \
-                /sciclone/home/thwalsh/hypernets/data/global_features_10000.parquet \
+          cp -a /sciclone/home/thwalsh/hypernets/data/test_full.parquet \
+                /sciclone/home/thwalsh/hypernets/data/global_features.parquet \
                 /tmp/
           [ "${HIERARCHICAL_HYPERNET}" = "true" ] && \
-            cp -a /sciclone/home/thwalsh/hypernets/data/instance_features_10000.parquet /tmp/
+            cp -a /sciclone/home/thwalsh/hypernets/data/instance_features.parquet /tmp/
 
           echo "Starting Dual-GPU hypernet evaluation…"
           source /venv/bin/activate
           pip install --quiet --no-cache-dir bert-score==0.3.13
 
-          python -u /sciclone/home/thwalsh/hypernets/training_scripts/evaluate_hypernet_10000.py \
-            --test_parquet /tmp/test_full_10000.parquet \
-            --global_features_parquet /tmp/global_features_10000.parquet \
+          python -u /sciclone/home/thwalsh/hypernets/training_scripts/evaluate_hypernet.py \
+            --test_parquet /tmp/test_full.parquet \
+            --global_features_parquet /tmp/global_features.parquet \
             $( [ "${HIERARCHICAL_HYPERNET}" = "true" ] && \
-               echo "--instance_features_parquet /tmp/instance_features_10000.parquet" ) \
+               echo "--instance_features_parquet /tmp/instance_features.parquet" ) \
             --base_ckpt /sciclone/home/thwalsh/hypernets/base_models/pythia_125m_clean \
             --model_root /sciclone/home/thwalsh/hypernets/models \
             --results_dir /sciclone/home/thwalsh/hypernets/results \
             --log_dir /sciclone/home/thwalsh/hypernets/log_files \
-            --checklist /sciclone/home/thwalsh/hypernets/log_files/eval_hypernet_checklist_10000.txt \
+            --checklist /sciclone/home/thwalsh/hypernets/log_files/eval_hypernet_checklist.txt \
             --bsz 8 \
             --variants "lora" \
             $( [ "${DEMO_MODE}" = "true" ] && echo "--demo_mode --sanity_checks" ) \
             $( [ "${HIERARCHICAL_HYPERNET}" = "true" ] && echo "--hierarchical_hypernet" || echo "--flat_hypernet" ) \
             $( [ "${DO_FEATURE_PERM}" = "true" ] && echo "--feature_permutation" ) \
-            2>&1 | tee /sciclone/home/thwalsh/hypernets/log_files/evaluate_hypernet_10000.log
+            2>&1 | tee /sciclone/home/thwalsh/hypernets/log_files/evaluate_hypernet.log
 
           echo "Evaluation finished."

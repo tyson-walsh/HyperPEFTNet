@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: evaluate-nonhypernet-10000
+  name: evaluate-nonhypernet
   namespace: thwalsh
 spec:
   securityContext:
@@ -18,7 +18,7 @@ spec:
     - name: local-vol
       emptyDir: {}
   containers:
-    - name: evaluate-nonhypernet-10000-container
+    - name: evaluate-nonhypernet-container
       image: ghcr.io/tyson-walsh/hypernets-pip-slim:v12
       imagePullPolicy: Always
       resources:
@@ -51,15 +51,15 @@ spec:
           source /venv/bin/activate
           pip install --quiet bert-score==0.3.13
 
-          python /sciclone/home/thwalsh/hypernets/training_scripts/evaluate_nonhypernet_10000.py \
-            --test_parquet  /sciclone/home/thwalsh/hypernets/data/test_data_10000.parquet \
+          python /sciclone/home/thwalsh/hypernets/training_scripts/evaluate_nonhypernet.py \
+            --test_parquet  /sciclone/home/thwalsh/hypernets/data/test_data.parquet \
             --base_ckpt     /sciclone/home/thwalsh/hypernets/base_models/pythia_125m_clean \
             --models_dir    /sciclone/home/thwalsh/hypernets/models \
             --results_dir   /sciclone/home/thwalsh/hypernets/results \
             --log_dir       /sciclone/home/thwalsh/hypernets/log_files \
-            --checklist     /sciclone/home/thwalsh/hypernets/log_files/eval_nonhypernet_checklist_10000.txt \
+            --checklist     /sciclone/home/thwalsh/hypernets/log_files/eval_nonhypernet_checklist.txt \
             --bsz 8 \
             $( [ "${DEMO_MODE}" = "true" ] && echo "--demo_mode" ) \
-            > /sciclone/home/thwalsh/hypernets/log_files/evaluate_nonhypernet_10000.log 2>&1
+            > /sciclone/home/thwalsh/hypernets/log_files/evaluate_nonhypernet.log 2>&1
 
           echo "Evaluation finished."

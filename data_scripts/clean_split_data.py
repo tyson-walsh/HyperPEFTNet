@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-clean_split_data_10000.py
+clean_split_data.py
 =========================
 
 Reads the full Reddit corpus for 10 000 target users, performs light text
@@ -31,8 +31,8 @@ Implementation Outline
 2. Clean each `content` string (ASCII norm, slash-cmd & emoticon markers, etc.).  
 3. **Detect + drop** malformed `gid`s (empty target or context).  
 4. Perform a per-user 70 / 20 / 10 chain-level split.  
-5. Persist `<split>_data_10000.parquet` / `.csv` and
-   `coverage_report_10000.csv`.  
+5. Persist `<split>_data.parquet` / `.csv` and
+   `coverage_report.csv`.  
 6. Log detailed statistics for reproducibility.
 """
 
@@ -48,15 +48,15 @@ import pyarrow as pa, pyarrow.parquet as pq
 DATA_DIR  = Path("/sciclone/home/thwalsh/hypernets/data")
 RAW_FILE  = DATA_DIR / "reddit_threads_2010_2016.parquet"
 
-TRAIN_CSV  = DATA_DIR / "train_data_10000.csv"
-VAL_CSV    = DATA_DIR / "val_data_10000.csv"
-TEST_CSV   = DATA_DIR / "test_data_10000.csv"
+TRAIN_CSV  = DATA_DIR / "train_data.csv"
+VAL_CSV    = DATA_DIR / "val_data.csv"
+TEST_CSV   = DATA_DIR / "test_data.csv"
 
-TRAIN_PARQ = DATA_DIR / "train_data_10000.parquet"
-VAL_PARQ   = DATA_DIR / "val_data_10000.parquet"
-TEST_PARQ  = DATA_DIR / "test_data_10000.parquet"
+TRAIN_PARQ = DATA_DIR / "train_data.parquet"
+VAL_PARQ   = DATA_DIR / "val_data.parquet"
+TEST_PARQ  = DATA_DIR / "test_data.parquet"
 
-COVERAGE_CSV = DATA_DIR / "coverage_report_10000.csv"
+COVERAGE_CSV = DATA_DIR / "coverage_report.csv"
 
 TRAIN_RATIO, VAL_RATIO, TEST_RATIO = 0.70, 0.20, 0.10
 RANDOM_SEED = 42

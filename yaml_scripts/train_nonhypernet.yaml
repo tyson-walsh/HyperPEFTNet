@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: train-nonhypernet-10000
+  name: train-nonhypernet
   namespace: thwalsh
 spec:
   securityContext:
@@ -20,7 +20,7 @@ spec:
       emptyDir: {}
 
   containers:
-    - name: train-nonhypernet-10000-container
+    - name: train-nonhypernet-container
       image: ghcr.io/tyson-walsh/hypernets-pip-slim:v12
       imagePullPolicy: Always
       resources:
@@ -50,19 +50,19 @@ spec:
 
           # ---------- Stage Parquets to local NVMe ----------
           echo "Staging Parquet splits to /tmp (NVMe) …"
-          cp -a /sciclone/home/thwalsh/hypernets/data/train_data_10000.parquet \
-                /sciclone/home/thwalsh/hypernets/data/val_data_10000.parquet   \
+          cp -a /sciclone/home/thwalsh/hypernets/data/train_data.parquet \
+                /sciclone/home/thwalsh/hypernets/data/val_data.parquet   \
                 /tmp/
 
           echo "Starting single-GPU NON-hypernetwork training..."
           source /venv/bin/activate
 
-          python /sciclone/home/thwalsh/hypernets/training_scripts/train_nonhypernet_10000.py \
-            --train_parquet /tmp/train_data_10000.parquet \
-            --val_parquet   /tmp/val_data_10000.parquet \
+          python /sciclone/home/thwalsh/hypernets/training_scripts/train_nonhypernet.py \
+            --train_parquet /tmp/train_data.parquet \
+            --val_parquet   /tmp/val_data.parquet \
             --base_ckpt     /sciclone/home/thwalsh/hypernets/base_models/pythia_125m_clean \
             --models_output_dir /sciclone/home/thwalsh/hypernets/models \
-            > /sciclone/home/thwalsh/hypernets/log_files/train_nonhypernet_10000.log 2>&1
+            > /sciclone/home/thwalsh/hypernets/log_files/train_nonhypernet.log 2>&1
 
           echo "Training completed."
           ls -lh /sciclone/home/thwalsh/hypernets/models

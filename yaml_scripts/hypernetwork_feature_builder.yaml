@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: hypernet-dataset-10000
+  name: hypernet-dataset
   namespace: thwalsh
 spec:
   securityContext:
@@ -19,7 +19,7 @@ spec:
     - name: local-vol
       emptyDir: {}
   containers:
-    - name: hypernet-dataset-container-10000
+    - name: hypernet-dataset-container
       image: "ghcr.io/tyson-walsh/hypernets-pip-slim:v12"
       imagePullPolicy: Always
       resources:
@@ -70,9 +70,9 @@ spec:
           cd /sciclone/home/thwalsh/hypernets/data_scripts
           mkdir -p ../log_files
 
-          echo "Running hypernetwork_feature_builder_10000.py with 2 shards..."
-          python hypernetwork_feature_builder_10000.py --shards 2 --force \
-            > ../log_files/hypernetwork_feature_builder_10000.log 2>&1
+          echo "Running hypernetwork_feature_builder.py with 2 shards..."
+          python hypernetwork_feature_builder.py --shards 2 --force \
+            > ../log_files/hypernetwork_feature_builder.log 2>&1
 
           echo "Hypernetwork Dataset Processing completed successfully at $(date)"
           ls -lh

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-evaluate_hypernet_10000.py
+evaluate_hypernet.py
 ==========================
 
 Offline evaluation for the four PEFT + hypernetwork variants (LoRA, Adapter,
@@ -13,18 +13,18 @@ evaluating the hierarchical hypernetwork).
 
 What the script produces
 ------------------------
-* **Per-variant JSON** – `results/eval_{flat|hier}_hypernet_{variant}_10000.json`  
+* **Per-variant JSON** – `results/eval_{flat|hier}_hypernet_{variant}.json`  
   ‣ a *summary* block with scalar metrics  
   ‣ the **top-10** generated replies (highest BERTScore, BLEU tie-break) with
     their individual metrics  
-* **Combined JSON** – `results/eval_{flat|hier}_hypernet_results_10000.json`
+* **Combined JSON** – `results/eval_{flat|hier}_hypernet_results.json`
   containing only the summary blocks (ready for plotting).  
 * **All generations** – `results/eval_generated.parquet` with one row per
   (conversation, variant) so that downstream scripts can run self-feedback or
   persona consistency checks.  
-* **Checklist file** – `log_files/eval_hypernet_checklist_10000.txt` updated
+* **Checklist file** – `log_files/eval_hypernet_checklist.txt` updated
   as each variant finishes, preventing accidental re-runs.  
-* **Central log** – `log_files/evaluate_hypernet_10000.log`.
+* **Central log** – `log_files/evaluate_hypernet.log`.
 
 Metrics computed
 ----------------
@@ -140,8 +140,8 @@ except NameError:
     ROOT = Path.cwd()
 sys.path.extend([str(ROOT / "data_scripts"), str(ROOT / "PEFT_scripts")])
 
-from hypernetwork_dataset_10000 import HypernetConversationDataset10000
-from hierarchical_hypernetwork_10000 import (
+from hypernetwork_dataset import HypernetConversationDataset
+from hierarchical_hypernetwork import (
     HierarchicalHypernetwork,
     PEFTHypernetModel,
     G_SIGNALS,
@@ -328,10 +328,10 @@ def _theta_bar_device_fix(mod: nn.Module, args, kwargs):
 # dataset utilities for permutation importance
 # -----------------------------------------------------------------------
 def _dataset_with_permuted_global(
-    ds: HypernetConversationDataset10000,
+    ds: HypernetConversationDataset,
     col_idx: int,
     rng: np.random.Generator
-) -> HypernetConversationDataset10000:
+) -> HypernetConversationDataset:
     for cand in ("_gdf", "gdf", "global_df", "global_features_df"):
         if hasattr(ds, cand):
             gdf_attr = cand
@@ -349,7 +349,7 @@ def _dataset_with_permuted_global(
     g_cols = getattr(ds, "_g_cols", _default_gfeatures)
     i_cols = getattr(ds, "_i_cols", []) if getattr(ds, "hierarchical", False) else []
 
-    new_ds = HypernetConversationDataset10000(
+    new_ds = HypernetConversationDataset(
         ds.raw_df,
         ds.tokenizer,
         gdf_perm,
@@ -1062,7 +1062,7 @@ def main() -> None:
     args, _ = p.parse_known_args()
 
     Path(args.log_dir).mkdir(parents=True, exist_ok=True)
-    log_path = Path(args.log_dir) / "evaluate_hypernet_10000.log"
+    log_path = Path(args.log_dir) / "evaluate_hypernet.log"
     fh = logging.FileHandler(log_path, mode="a")
     fh.setLevel(logging.INFO)
     ch = logging.StreamHandler(sys.stdout)
@@ -1127,12 +1127,12 @@ def main() -> None:
         tok.pad_token_id = tok.convert_tokens_to_ids("[PAD]")
 
     # Build dataset aligned with training spec
-    ck_probe = Path(args.models_dir) / f"{mode_tag}_hypernet_lora_10000"
+    ck_probe = Path(args.models_dir) / f"{mode_tag}_hypernet_lora"
     if not ck_probe.exists():
-        ck_probe = Path(args.models_dir) / f"{mode_tag}_hypernet_lora_model_10000"
+        ck_probe = Path(args.models_dir) / f"{mode_tag}_hypernet_lora_model"
     gcols = load_feature_spec(ck_probe)
 
-    ds = HypernetConversationDataset10000(
+    ds = HypernetConversationDataset(
         df_test, tok, gdf, idf, hierarchical=hierarchical
     )
     ds.set_selected_features(
@@ -1187,10 +1187,10 @@ def main() -> None:
                 continue
 
             candidates = [
-                f"{mode_tag}_hypernet_{variant}_10000",
-                f"{mode_tag}_hypernet_{variant}_model_10000",
-                f"demo_runs/{mode_tag}_hypernet_{variant}_10000",
-                f"demo_runs/{mode_tag}_hypernet_{variant}_model_10000",
+                f"{mode_tag}_hypernet_{variant}",
+                f"{mode_tag}_hypernet_{variant}_model",
+                f"demo_runs/{mode_tag}_hypernet_{variant}",
+                f"demo_runs/{mode_tag}_hypernet_{variant}_model",
             ]
             ck = next((Path(args.models_dir) / p for p in candidates if (Path(args.models_dir) / p).exists()), None)
             if ck is None:
@@ -1511,7 +1511,7 @@ def main() -> None:
                     logging.warning("Feature permutation skipped: %s", e)
 
             if not _disable_io:
-                v_path = results_dir / f"eval_{mode_tag}_hypernet_{variant}_10000.json"
+                v_path = results_dir / f"eval_{mode_tag}_hypernet_{variant}.json"
                 json.dump({variant: {"summary": summary, "samples": top_records}}, v_path.open("w"), indent=2)
                 logging.info("[%s] report → %s", variant, v_path)
                 combined[variant] = {"summary": summary}
@@ -1564,7 +1564,7 @@ def main() -> None:
 
     if not _disable_io:        
         sub_tag   = "" if "demo_runs" not in str(ck) else "demo_"
-        comb_path = results_dir / f"{sub_tag}eval_{mode_tag}_hypernet_results_10000.json"
+        comb_path = results_dir / f"{sub_tag}eval_{mode_tag}_hypernet_results.json"
         
         json.dump(combined, comb_path.open("w"), indent=2)
         logging.info("Combined summary → %s", comb_path)

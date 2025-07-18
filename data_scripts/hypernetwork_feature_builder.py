@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-hypernetwork_feature_builder_10000.py
+hypernetwork_feature_builder.py
 =====================================
 
 Creates the **global-** and **instance-level** feature tables that supply the
@@ -155,8 +155,8 @@ Pipeline overview
 3. **Accumulate** author-level statistics, reply delays, and 24-hour posting
    histograms.  
 4. **Write**  
-   * `global_features_10000.parquet` (one row / thread)  
-   * `instance_features_10000.parquet` (one row / reply)  
+   * `global_features.parquet` (one row / thread)  
+   * `instance_features.parquet` (one row / reply)  
    plus JSON side-cars for column order and z-score normalisation.  
 5. **Resume / multi-GPU** friendly via shard filtering and chunk checkpoints.
 
@@ -190,13 +190,13 @@ except ImportError:
 
 # ————————————————————— CONFIG ————————————————————— #
 DATA_DIR   = Path("/sciclone/home/thwalsh/hypernets/data")
-TRAIN_PARQ = DATA_DIR / "train_data_10000.parquet"
-VAL_PARQ   = DATA_DIR / "val_data_10000.parquet"
-TEST_PARQ  = DATA_DIR / "test_data_10000.parquet"
+TRAIN_PARQ = DATA_DIR / "train_data.parquet"
+VAL_PARQ   = DATA_DIR / "val_data.parquet"
+TEST_PARQ  = DATA_DIR / "test_data.parquet"
 
-OUT_G_PARQ = DATA_DIR / "global_features_10000.parquet"
-OUT_I_PARQ = DATA_DIR / "instance_features_10000.parquet"
-OUT_STATS  = DATA_DIR / "feature_norm_stats_10000.json"
+OUT_G_PARQ = DATA_DIR / "global_features.parquet"
+OUT_I_PARQ = DATA_DIR / "instance_features.parquet"
+OUT_STATS  = DATA_DIR / "feature_norm_stats.json"
 
 SENT_MODEL    = "/sciclone/home/thwalsh/hypernets/models/distilbert-sst2"
 SBERT_PATH    = "/sciclone/home/thwalsh/hypernets/sentence_transformers/all-MiniLM-L6-v2"
